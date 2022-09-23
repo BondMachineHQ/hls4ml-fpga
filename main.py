@@ -83,6 +83,11 @@ class Trainer:
 
         if dataset not in self.available_datasets:
             raise Exception("Dataset not available. Availables are: ", self.available_datasets)
+
+        # Create the dataset dir if not exists
+        if not os.path.exists("datasets"):
+            os.makedirs("datasets")
+
         self.dataset = dataset
         file_exists = os.path.exists("datasets/"+dataset+'_X_train_val.npy')
         user_reply = ""

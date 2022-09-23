@@ -41,7 +41,7 @@ Flash the IMG file on a sd-card and the EBAZ4205 is ready to run the machine lea
 ##### STEP 1: Clone this repo and setup environment with conda
 Simply run the following commands to setup the environment and install the necessary packages
 ```
-git clone https://github.com/Bianco95/hls4ml-fpga.git
+git clone https://github.com/BondMachineHQ/ml-ebaz4205.git
 conda create --name hls4ml-env python=3.8.0
 conda activate hls4ml-env
 pip3 install -r requirements.txt

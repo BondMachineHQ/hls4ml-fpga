@@ -6,3 +6,4 @@ pandas
 tensorflow
 pydot
 xlrd
+networkx
