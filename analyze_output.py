@@ -1,12 +1,53 @@
 import numpy as np
+from sklearn import metrics
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_curve, auc
 import math
 import statistics
 import matplotlib.pyplot as plt
 import scikitplot as skplt
+from matplotlib import pyplot
+from sklearn.metrics import f1_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import confusion_matrix
 
+def compute_accuracy(true_y, output_y):
+    return accuracy_score(np.argmax(true_y, axis=1), np.argmax(output_y, axis=1))
 
+def compute_f1_score(true_y, output_y):
+    return f1_score(np.argmax(true_y, axis=1), np.argmax(output_y, axis=1), average='macro')
+    
+def compute_precision(true_y, output_y):
+    return precision_score(np.argmax(true_y, axis=1), np.argmax(output_y, axis=1), average='macro')
+
+def compute_recall(true_y, output_y):
+    return recall_score(np.argmax(true_y, axis=1), np.argmax(output_y, axis=1), average='macro')
+
+def compute_sensitivity(true_y, output_y):
+    tn, fp, fn, tp = confusion_matrix(np.argmax(true_y, axis=1), np.argmax(output_y, axis=1)).ravel()
+    return tp / (fn+tp)
+
+def compute_specificity(true_y, output_y):
+    tn, fp, fn, tp = confusion_matrix(np.argmax(true_y, axis=1), np.argmax(output_y, axis=1)).ravel()
+    return tn / (tn+fp)
+
+def get_roc_curve(true_y, output_y, model_name):
+    fpr, tpr, threshold = metrics.roc_curve(np.argmax(true_y, axis=1), np.argmax(output_y, axis=1))
+    roc_auc = metrics.auc(fpr, tpr)
+
+    # method I: plt
+    import matplotlib.pyplot as plt
+    plt.title('Receiver Operating Characteristic of '+model_name)
+    plt.plot(fpr, tpr, 'b', label = 'AUC = %0.2f' % roc_auc)
+    plt.legend(loc = 'lower right')
+    plt.plot([0, 1], [0, 1],'r--')
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
+    plt.ylabel('True Positive Rate')
+    plt.xlabel('False Positive Rate')
+    plt.show()
+    
 def load_classes(dataset):
     classes = np.load('datasets/'+dataset+'_classes.npy', allow_pickle=True)
     return classes
@@ -94,18 +135,48 @@ print("Accuracy hls4ml         on ebaz4205 on real label: {}".format(accuracy_sc
 
 classes = load_classes(dataset_name)
 
-fpr = dict()
-tpr = dict()
-roc_auc = dict()
-for i in range(len(classes)):
-    fpr[i], tpr[i], _ = roc_curve(np.argmax(y_test, axis=1), np.argmax(hls4ml_output, axis=1))
-    roc_auc[i] = auc(fpr[i], tpr[i])
-    
-plt.figure()
-plt.plot(fpr[1], tpr[1])
-plt.xlim([0.0, 1.0])
-plt.ylim([0.0, 1.05])
-plt.xlabel('False Positive Rate')
-plt.ylabel('True Positive Rate')
-plt.title('Receiver operating characteristic')
-plt.show()
+accuracy_keras = compute_accuracy(y_test, keras_output)
+f1_score_keras = compute_f1_score(y_test, keras_output)
+precision_keras = compute_precision(y_test, keras_output)
+recall_keras = compute_recall(y_test, keras_output)
+sensititivy_keras = compute_sensitivity(y_test, keras_output)
+specificity_keras = compute_specificity(y_test, keras_output)
+
+accuracy_bm = compute_accuracy(y_test, bm_output)
+f1_score_bm = compute_f1_score(y_test, bm_output)
+precision_bm = compute_precision(y_test, bm_output)
+recall_bm = compute_recall(y_test, bm_output)
+sensititivy_bm = compute_sensitivity(y_test, bm_output)
+specificity_bm = compute_specificity(y_test, bm_output)
+
+accuracy_hls4ml = compute_accuracy(y_test, hls4ml_output)
+f1_score_hls4ml = compute_f1_score(y_test, hls4ml_output)
+precision_hls4ml = compute_precision(y_test, hls4ml_output)
+recall_hls4ml = compute_recall(y_test, hls4ml_output)
+sensititivy_hls4ml = compute_sensitivity(y_test, hls4ml_output)
+specificity_hls4ml = compute_specificity(y_test, hls4ml_output)
+
+print("keras accuracy: ", accuracy_keras)
+print("keras f1 score: ", f1_score_keras)
+print("keras precision: ", precision_keras)
+print("keras recall: ", recall_keras)
+print("keras sensitivity: ", sensititivy_keras)
+print("keras specificity: ", specificity_keras)
+print("\n")
+print("bm accuracy: ", accuracy_bm)
+print("bm f1 score: ", f1_score_bm)
+print("bm precision: ", precision_bm)
+print("bm recall: ", recall_bm)
+print("bm sensitivity: ", sensititivy_bm)
+print("bm specificity: ", specificity_bm)
+print("\n")
+print("hls4ml accuracy: ", accuracy_hls4ml)
+print("hls4ml f1 score: ", f1_score_hls4ml)
+print("hls4ml precision: ", precision_hls4ml)
+print("hls4ml recall: ", recall_hls4ml)
+print("hls4ml sensitivity: ", sensititivy_hls4ml)
+print("hls4ml specificity: ", specificity_hls4ml)
+
+get_roc_curve(y_test, keras_output, "keras")
+get_roc_curve(y_test, bm_output, "bondmachine")
+get_roc_curve(y_test, hls4ml_output, "hls4ml")
