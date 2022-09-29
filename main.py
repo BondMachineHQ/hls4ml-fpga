@@ -486,7 +486,7 @@ class Trainer:
         # print(y_keras)
         accuracy = format(accuracy_score(np.argmax(self.y_test, axis=1), np.argmax(y_keras, axis=1)))
         print(bcolors.OKGREEN + " # INFO: Accuracy is "+accuracy+bcolors.WHITE)
-        user_reply = input(bcolors.WARNING + " # QUESTION: Model has been exported in JSON for Bondmachine (path is: models/"+self.dataset+"/modelBM.json), do you want to continue with HLS4ML? (y/n)")
+        user_reply = input(bcolors.WARNING + " # QUESTION: Model has been exported in JSON for Bondmachine (path is: models/"+self.dataset+"/modelBM.json), do you want to continue with HLS4ML? (y/n)"+bcolors.WHITE)
         if user_reply != "y":
             sys.exit(0)
             
