@@ -478,11 +478,27 @@ class Trainer:
         self.model.save('models/'+self.dataset+'/model.h5')
         meta_graph_def = tf.train.export_meta_graph(filename='models/'+self.dataset+'_KERAS_model.meta')
 
+    def dump_csv_prediction(self, predictions):
+        results = []
+        for pred in predictions:
+            prediction = np.argmax(pred, axis=0)
+            to_save = [pred[0], pred[1] ,prediction]
+            results.append(to_save)
+            
+        import csv
+        fields = ['probability_0', 'probability_1', 'classification'] 
+
+        with open("datasets/"+self.dataset+'_swprediction.csv', 'w') as f:
+            write = csv.writer(f)
+            write.writerow(fields)
+            write.writerows(results)
+
     def exec_test(self):
         print(self.model.summary())
         y_keras = self.model.predict(self.X_test)
         np.save("datasets/"+self.dataset+'_y_keras.npy', y_keras)
-        np.savetxt("datasets/"+self.dataset+'_swprediction.csv', y_keras, delimiter=",")
+        self.dump_csv_prediction(y_keras)
+        #np.savetxt("datasets/"+self.dataset+'_swprediction.csv', y_keras, delimiter=",")
         # print(self.X_test)
         accuracy = format(accuracy_score(np.argmax(self.y_test, axis=1), np.argmax(y_keras, axis=1)))
         print(bcolors.OKGREEN + " # INFO: Accuracy is "+accuracy+bcolors.WHITE)
