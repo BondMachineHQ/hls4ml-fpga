@@ -58,7 +58,7 @@ class Trainer:
             "higgs",
             "dna"]
         self.dataset = None
-        self.vivado_path = '/tools/Xilinx/Vivado/2019.2/bin:'
+        self.vivado_path = '/tools/Xilinx/Vivado/2021.1/bin:'
         self.seed = 0
         self.le = LabelEncoder()
         self.X_train_val = None
@@ -221,6 +221,8 @@ class Trainer:
         weights = []
         nodes = []
 
+        weights_value = []
+
         # save weigths
         for i in range(0 , len(layers)):
 
@@ -230,6 +232,9 @@ class Trainer:
                 for w in range(0, len(layer_weights[m])):
                     try:
                         for v in range(0, len(layer_weights[m][w])):
+                            
+                            weights_value.append(float(layer_weights[m][w][v]))
+
                             weight_info = {
                                     "Layer": i+1,
                                     "PosCurrLayer": v,
@@ -240,12 +245,10 @@ class Trainer:
                     except:
                         continue
 
-            
-            #print(weights)
-            #flat_layer_weigth = [item for sublist in layer_weights for item in sublist]
             if i == 0:
                 for units in range(0, layers[i].units):
                     weights_l0 = layers[i].get_weights()[0]
+
                     for w in range(0, len(weights_l0)):
                         node_info = {
                             "Layer": 0,
@@ -267,6 +270,8 @@ class Trainer:
                         "Bias": bias.tolist()[units]
                     }
                     nodes.append(node_info)
+
+                    weights_value.append(node_info["Bias"])
                 else:
                     bias = layers[i].get_weights()[1]
                     node_info = {
@@ -277,6 +282,7 @@ class Trainer:
                     }
                     nodes.append(node_info)
 
+                    weights_value.append(node_info["Bias"])
 
             if i == len(layers) - 1:
                 for l in range(0, len(layer_weights[0][0])):
@@ -303,6 +309,9 @@ class Trainer:
 
 
             if i == len(layers) - 1:
+
+                layer_weights = layers[i].get_weights()
+
                 for l in range(0, len(layer_weights[0][0])):
                     node_info = {
                         "Layer": i+3,
@@ -318,17 +327,8 @@ class Trainer:
                                     "PosPrevLayer": l,
                                     "Value": 1
                                 }
+                    print(weight_info)
                     weights.append(weight_info)
-
-
-            # for j in range(0, len(flat_layer_weigth)):
-            #     weight_info = {
-            #         "Layer": i,
-            #         "PosCurrLayer": j,
-            #         "PosPrevLayer": i,
-            #         "Value": flat_layer_weigth[j]
-            #     }
-            #     weights.append(weight_info)
 
         to_dump["Nodes"] = nodes
         to_dump["Weights"] = weights
@@ -476,7 +476,7 @@ class Trainer:
         #print(bcolors.OKGREEN + " # output name", self.model.output.op.name+bcolors.WHITE)
         print(bcolors.OKGREEN + " # INFO: Training finished, saved model path: "+'models/'+self.dataset+'_KERAS_model.h5'+bcolors.WHITE)
         self.model.save('models/'+self.dataset+'/model.h5')
-        meta_graph_def = tf.train.export_meta_graph(filename='models/'+self.dataset+'_KERAS_model.meta')
+        #meta_graph_def = tf.train.export_meta_graph(filename='models/'+self.dataset+'_KERAS_model.meta')
 
     def dump_csv_prediction(self, predictions):
         results = []
@@ -532,9 +532,9 @@ class Trainer:
                                                         board=self.fpga_part_number)
 
         self.hls_model.compile()
-        supported_boards = hls4ml.templates.get_supported_boards_dict().keys()
-        print(bcolors.OKGREEN + " # Supported boards: "+str(supported_boards)+bcolors.WHITE)
-        hls4ml.templates.get_backend('VivadoAccelerator').create_initial_config()
+        #supported_boards = hls4ml.templates.get_supported_boards_dict().keys()
+        #print(bcolors.OKGREEN + " # Supported boards: "+str(supported_boards)+bcolors.WHITE)
+        #hls4ml.templates.get_backend('VivadoAccelerator').create_initial_config()
         self.hls_model.build(csim=False, synth=True, export=True)
         #hls4ml.templates.VivadoAcceleratorBackend.make_bitfile(self.hls_model)
 
