@@ -29,7 +29,7 @@ The following diagram represents the flow starting from the training of the neur
 
 This tutorial will be divided in three parts: in the first one, if you choose to use the HLS4Ml toolkit, you will generate the IP using the hls4ml library which is the core part of the inference phase on the FPGA.
 If you choose to use the BondMachine framework, you will generate a JSON file that describeds the neural network that will be used by NeuralBond (the BondMachine module that is able to understand this file).
-In the second part, if you chose HLS4ML, you will use the IP generated to build the overall design which is necessary to generate the bistream that runs on the FPGA.
+In the second part, if you chose HLS4ML, you will use the IP generated to build the overall design which is necessary to generate the bitstream that runs on the FPGA.
 If you chose BondMachine, you will use the generated JSON file and the BondMachine tools to create a project in order to synthesize the firmware.
 At the end of this tutorial you will have all the necessary files to try and test the DNN model on the ebaz with the help of PYNQ that provides the API to access and use the bitstream (third part).
 This guide does not focus on evaluating the accuracy performance of the neural network model or the speed of inference. The focus is on how to deploy a neural network on an FPGA that was previously used as control card of Ebit E9 + BTC miner.
