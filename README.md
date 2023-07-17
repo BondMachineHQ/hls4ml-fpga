@@ -18,8 +18,20 @@ The following libraries and tools have been used in order to achieve the goal:
 - [conda][5]
 - [bondmachine][9]
 
-This tutorial will be divided in two parts: in the first one, you will generate the IP using the hls4ml library which is the core part of the inference phase on the FPGA. The IP will be a part of the overall design which is necessary to generate the bistream that runs on the FPGA. 
-At the end of this tutorial you will have all the necessary files to try and test the DNN model on the ebaz with the help of PYNQ that provides the API to access and use the bitstream (second part).
+The following diagram represents the flow starting from the training of the neural network model with TensorFlow, up to the creation of the firmware.
+
+<div align="center"> 
+    <img src="/images/7_worflow.jpg" alt="workflow" style="display: block;
+        margin-left: auto;
+        margin-right: auto;
+        width: 50%;"/> 
+</div>
+
+This tutorial will be divided in three parts: in the first one, if you choose to use the HLS4Ml toolkit, you will generate the IP using the hls4ml library which is the core part of the inference phase on the FPGA.
+If you choose to use the BondMachine framework, you will generate a JSON file that describeds the neural network that will be used by NeuralBond (the BondMachine module that is able to understand this file).
+In the second part, if you chose HLS4ML, you will use the IP generated to build the overall design which is necessary to generate the bistream that runs on the FPGA.
+If you chose BondMachine, you will use the generated JSON file and the BondMachine tools to create a project in order to synthesize the firmware.
+At the end of this tutorial you will have all the necessary files to try and test the DNN model on the ebaz with the help of PYNQ that provides the API to access and use the bitstream (third part).
 This guide does not focus on evaluating the accuracy performance of the neural network model or the speed of inference. The focus is on how to deploy a neural network on an FPGA that was previously used as control card of Ebit E9 + BTC miner.
 
 [1]: https://github.com/fastmachinelearning/hls4ml
@@ -43,8 +55,8 @@ Flash the IMG file on a sd-card and the EBAZ4205 is ready to run the machine lea
 Simply run the following commands to setup the environment and install the necessary packages
 ```
 git clone https://github.com/BondMachineHQ/ml-ebaz4205.git
-conda create --name hls4ml-env python=3.8.0
-conda activate hls4ml-env
+conda create --name mlfpga-env python=3.8.0
+conda activate mlfpga-env
 pip3 install -r requirements.txt
 ```
 
@@ -58,14 +70,14 @@ Datasets are fetched inside the code thanks to [openML][6].
 Here the dataset specified is **hls4ml_lhc_jets_hlf** whose specifications can be found on this [link][7].
 You can also specify the type of neural network (at the moment is only supported a simple neural network with a bunch of dense layer).
 If the dataset has already been downloaded, you will be asked if you want to download it again. The same is for the neural network model, if it already exists you will be asked if you want to train it again. 
-In the near future more commands line options will be supported, for example training epochs, batch size, DNN architecture (i.e. number of layers and nodes, activation functions, ...).
-The default model is a MLP sequential model fully connected with n hidden layer.
+The file **specifics.json" describes all the parameters of the neural network model you want to train.
 <img src="/images/nngraph.png" alt="EBAZ4205" style="display: block;
     margin-left: auto;
     margin-right: auto;
     width: 80%;"/> 
     
 The neural network model architecture is very basic, the goal of this guide is to deploy the ML model on the FPGA and moreover the resources of the EBAZ4205 are very limited. In fact, the FPGA resources in terms of **LUTS**, **BRAM** and **FLIPFLOP** essentially depend on two factors: the complexity of the model and the **number of features** of the dataset. Regarding the latter, a study was carried out on the occupation of FPGA resources using the same neural network as the dataset varies, which has shown that the occupation of FPGA resources grows with respect to the number of features.
+If all goes well, you will be notified that the training is finished and the model has been exported to work with BondMachine. You will also be asked if you want to continue to create the IP module for HLS4ML as well. If you decide to continue (y) the IP module will be generated and you can continue following the guide. Otherwise, if you decide to use BondMachine to generate the firmware, stop here and continue to the README section below.
 Wait for the command to complete. If all went well, under the folder **_models_fpga/hls4ml_lhc_jets_hlf_hls4ml_prj/myproject_prj/solution1/impl_** there will be the newly created ip.
 
 ##### STEP 3: Use vivado for final design and bitstream 
@@ -145,7 +157,7 @@ pip3 show tensorflow
 ```
 Than, change directory and go inside tensorflow folder: 
 ```
-cd ../anaconda3/envs/hls4ml-env/lib/python3.8/site-packages/tensorflow
+cd ../anaconda3/envs/mlfpga-env/lib/python3.8/site-packages/tensorflow
 ```
 Than, exec the following command to create the *protobuf* starting from the last checkpoint model saved during training phase:
 ```
