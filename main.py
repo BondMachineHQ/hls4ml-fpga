@@ -21,6 +21,8 @@ from os.path import exists
 import networkx as nx
 import pylab
 from networkx.drawing.nx_agraph import graphviz_layout
+import subprocess
+
 
 class bcolors:
     WHITE = '\033[97m'
@@ -36,10 +38,11 @@ class bcolors:
 
 class Trainer:
 
-    def __init__(self, fpga_part_number, nn_model_type):
+    def __init__(self, fpga_part_number, fpga_board_name, nn_model_type):
         
         self.nn_model_type = nn_model_type
         self.fpga_part_number = fpga_part_number
+        self.fpga_board_name = fpga_board_name
         self.available_datasets = [
             "mnist_784", 
             "CIFAR_10", 
@@ -58,7 +61,7 @@ class Trainer:
             "higgs",
             "dna"]
         self.dataset = None
-        self.vivado_path = '/tools/Xilinx/Vivado/2021.1/bin:'
+        self.vivado_path = '/home/ubuntu/Vivado/2019.2/bin:'
         self.seed = 0
         self.le = LabelEncoder()
         self.X_train_val = None
@@ -67,10 +70,35 @@ class Trainer:
         self.y_test = None
         self.model = None
         self.hls_model = None
-        self.use_part = True
         self.classes_len = 0
         self.train_size = 0
         self.network_spec = None
+        self.hls4ml_supported_boards = [
+            {
+                "name": "pynq-z2",
+                "part": "xc7z020clg400-1"
+            },
+            {
+                "name": "zcu102",
+                "part": "xczu9eg-ffvb1156-2-e"
+            },
+            {
+                "name": "alveo-u50",
+                "part": "xcu50-fsvh2104-2-e"
+            },
+            {
+                "name": "alveo-u250",
+                "part": "xcu250-figd2104-2L-e"
+            },
+            {
+                "name": "alveo-u200",
+                "part": "xcu200-fsgd2104-2-e"
+            },
+            {
+                "name": "alveo-u280",
+                "part": "xcu280-fsvh2892-2L-e"
+            }
+        ]
 
     def initialize(self) -> None:
         
@@ -169,7 +197,7 @@ class Trainer:
                     activation_function = self.network_spec["network"]["arch"][i]["activation_function"]
                     neurons = self.network_spec["network"]["arch"][i]["neurons"]
                     if i == 0:
-                        self.model.add(Dense(neurons, input_shape=(self.X_train_val.shape[1],), kernel_regularizer=l1(0.0001)))
+                        self.model.add(Dense(neurons, activation=activation_function, input_shape=(self.X_train_val.shape[1],), kernel_regularizer=l1(0.0001)))
                     else:
                         self.model.add(Dense(neurons, activation=activation_function, name=layer_name, kernel_regularizer=l1(0.0001)))
                     #self.model.add(Activation(activation=activation_function))
@@ -508,13 +536,48 @@ class Trainer:
             
         input(bcolors.OKGREEN+" # INFO: press enter to continue"+bcolors.WHITE)
 
-    def build_model_fpga(self):
-        config = hls4ml.utils.config_from_keras_model(self.model, granularity='name')
+    def isBoardSupported(self):
+
+        for board in self.hls4ml_supported_boards:
+            if board["name"] == self.fpga_board_name:
+                return True
         
-        print(bcolors.OKGREEN + " # INFO: Is using part number "+str(self.use_part)+bcolors.WHITE)
+        return False
+
+    def build_model_fpga(self):
+
+        try:
+            subprocess.check_output("sudo timedatectl set-ntp false", shell=True)
+            subprocess.check_output("sudo date -s '3 years ago'", shell=True)
+        except subprocess.CalledProcessError as e:
+            raise Exception(f"Command failed with exit code {e.returncode}") from e
+
+        config = hls4ml.utils.config_from_keras_model(self.model, granularity='name')
+
+        if self.fpga_board_name == None and self.fpga_part_number != None:
+            for board in self.hls4ml_supported_boards:
+                if  board["part"] == self.fpga_part_number:
+                    self.fpga_board_name = board["name"]
+        elif self.fpga_board_name != None and self.fpga_part_number == None:
+            for board in self.hls4ml_supported_boards:
+                if  board["name"] == self.fpga_board_name:
+                    self.fpga_part_number = board["part"]
+
+        print(bcolors.OKGREEN + " # INFO: fpga board name      "+str(self.fpga_board_name)+bcolors.WHITE)
         print(bcolors.OKGREEN + " # INFO: fpga part number     "+self.fpga_part_number+bcolors.WHITE)
 
-        if self.use_part == True:
+        if self.isBoardSupported() == True:
+            print(bcolors.OKGREEN + " # INFO: fpga board is supported, build the firmware      "+str(self.fpga_board_name)+bcolors.WHITE)
+            self.hls_model = hls4ml.converters.convert_from_keras_model(
+                                                        self.model,
+                                                        backend='VivadoAccelerator',
+                                                        io_type='io_stream',
+                                                        hls_config=config,
+                                                        output_dir='models_fpga/'+self.dataset+'_hls4ml_prj',
+                                                        board=self.fpga_board_name,
+                                                        part=self.fpga_part_number)
+        else:
+            print(bcolors.OKGREEN + " # INFO: fpga board is not supported, build the IP module for      "+str(self.fpga_board_name)+bcolors.WHITE)
             self.hls_model = hls4ml.converters.convert_from_keras_model(
                                                         self.model,
                                                         backend='VivadoAccelerator',
@@ -522,50 +585,42 @@ class Trainer:
                                                         hls_config=config,
                                                         output_dir='models_fpga/'+self.dataset+'_hls4ml_prj',
                                                         part=self.fpga_part_number)
-        else:
-            self.hls_model = hls4ml.converters.convert_from_keras_model(
-                                                        self.model,
-                                                        backend='VivadoAccelerator',
-                                                        io_type='io_stream',
-                                                        hls_config=config,
-                                                        output_dir='models_fpga/'+self.dataset+'_hls4ml_prj',
-                                                        board=self.fpga_part_number)
 
         self.hls_model.compile()
-        #supported_boards = hls4ml.templates.get_supported_boards_dict().keys()
-        #print(bcolors.OKGREEN + " # Supported boards: "+str(supported_boards)+bcolors.WHITE)
-        #hls4ml.templates.get_backend('VivadoAccelerator').create_initial_config()
-        self.hls_model.build(csim=False, synth=True, export=True)
-        #hls4ml.templates.VivadoAcceleratorBackend.make_bitfile(self.hls_model)
+        if self.isBoardSupported() == True:
+            self.hls_model.build(csim=False, synth=True, export=True, bitfile=True)
+        else:
+            self.hls_model.build(csim=False, synth=True, export=True, bitfile=False)
+
+        try:
+            subprocess.check_output("sudo timedatectl set-ntp true", shell=True)
+        except subprocess.CalledProcessError as e:
+            raise Exception(f"Command failed with exit code {e.returncode}") from e
 
 parser = argparse.ArgumentParser(description="Arguments for training nn", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("-d", "--dataset", help="dataset name")
-parser.add_argument("-b", "--fpga_board_number", help="fpga board number")
+parser.add_argument("-b", "--fpga_board_name", help="fpga board number")
 parser.add_argument("-f", "--fpga_part_number", help="fpga part number")
 parser.add_argument("-m", "--nn_model_type", help="neural network architecture")
 args = vars(parser.parse_args())
 dataset_name = args["dataset"]
 fpga_part_number = args["fpga_part_number"]
-fpga_board_number = args["fpga_board_number"]
+fpga_board_name = args["fpga_board_name"]
 nn_model_type = args["nn_model_type"]
 
 if dataset_name == None or len(dataset_name.replace(" ", "")) == 0:
     print(" # ERROR: No dataset name has been specified. ")
     sys.exit(1)
 
-use_part = True
-if fpga_part_number == None and fpga_board_number == None:
+if fpga_part_number == None and fpga_board_name == None:
     print(bcolors.OKGREEN+" # INFO: FPGA part number not specified, using default xc7z010clg400-1"+bcolors.WHITE)
     fpga_part_number = "xc7z010clg400-1"
-elif fpga_board_number != None:
-    fpga_part_number = fpga_board_number
-    use_part = False
+    fpga_board_name = "ebaz4205"
 
 if nn_model_type == None:
     nn_model_type = "MLP"
 
-t = Trainer(fpga_part_number, nn_model_type)
-t.use_part = use_part
+t = Trainer(fpga_part_number,fpga_board_name,nn_model_type)
 t.initialize()
 try:
     t.setup_data(dataset_name)

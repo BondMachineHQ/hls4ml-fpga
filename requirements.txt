@@ -1,7 +1,7 @@
 hls4ml
 numpy
 matplotlib
-sklearn
+scikit-learn
 pandas
 tensorflow
 pydot

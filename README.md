@@ -1,6 +1,6 @@
 
 <div align="center"> 
-    <h2 align="center">Machine Learning with HLS4ML&PYNQ on EBAZ4205 FPGA!</h2>
+    <h2 align="center">Machine Learning with HLS4ML and BondMachine with PYNQ on EBAZ4205 FPGA!</h2>
     <img src="/images/0_ebazlogo.png" alt="EBAZ4205" style="display: block;
         margin-left: auto;
         margin-right: auto;
@@ -16,6 +16,7 @@ The following libraries and tools have been used in order to achieve the goal:
 - [pynq][3]
 - [vivado][4]
 - [conda][5]
+- [bondmachine][9]
 
 This tutorial will be divided in two parts: in the first one, you will generate the IP using the hls4ml library which is the core part of the inference phase on the FPGA. The IP will be a part of the overall design which is necessary to generate the bistream that runs on the FPGA. 
 At the end of this tutorial you will have all the necessary files to try and test the DNN model on the ebaz with the help of PYNQ that provides the API to access and use the bitstream (second part).
