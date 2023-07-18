@@ -21,7 +21,7 @@ The following libraries and tools have been used in order to achieve the goal:
 The following diagram represents the flow starting from the training of the neural network model with TensorFlow, up to the creation of the firmware.
 
 <div align="center"> 
-    <img src="/images/7_worflow.jpg" alt="workflow" style="display: block;
+    <img src="/images/7_worflow.png" alt="workflow" style="display: block;
         margin-left: auto;
         margin-right: auto;
         width: 50%;"/> 

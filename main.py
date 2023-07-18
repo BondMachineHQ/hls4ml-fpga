@@ -546,6 +546,9 @@ class Trainer:
 
     def build_model_fpga(self):
 
+        # change the date due to a Vivado bug
+        # https://support.xilinx.com/s/question/0D52E00006uxy49SAA/vivado-fails-to-export-ips-with-the-error-message-bad-lexical-cast-source-type-value-could-not-be-interpreted-as-target?language=en_US
+        
         try:
             subprocess.check_output("sudo timedatectl set-ntp false", shell=True)
             subprocess.check_output("sudo date -s '3 years ago'", shell=True)
@@ -567,7 +570,7 @@ class Trainer:
         print(bcolors.OKGREEN + " # INFO: fpga part number     "+self.fpga_part_number+bcolors.WHITE)
 
         if self.isBoardSupported() == True:
-            print(bcolors.OKGREEN + " # INFO: fpga board is supported, build the firmware      "+str(self.fpga_board_name)+bcolors.WHITE)
+            print(bcolors.OKGREEN + " # INFO: fpga board is supported, build also the firmware      "+str(self.fpga_board_name)+bcolors.WHITE)
             self.hls_model = hls4ml.converters.convert_from_keras_model(
                                                         self.model,
                                                         backend='VivadoAccelerator',
@@ -592,6 +595,8 @@ class Trainer:
         else:
             self.hls_model.build(csim=False, synth=True, export=True, bitfile=False)
 
+        # change the date due to a Vivado bug
+        # https://support.xilinx.com/s/question/0D52E00006uxy49SAA/vivado-fails-to-export-ips-with-the-error-message-bad-lexical-cast-source-type-value-could-not-be-interpreted-as-target?language=en_US
         try:
             subprocess.check_output("sudo timedatectl set-ntp true", shell=True)
         except subprocess.CalledProcessError as e:
