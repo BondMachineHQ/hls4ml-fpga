@@ -9,7 +9,8 @@ from tensorflow.keras.regularizers import l1
 import numpy as np
 import os
 import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
+import pandas as pd
+#tf.disable_v2_behavior()
 import ssl
 import sys
 import argparse
@@ -22,7 +23,8 @@ import networkx as nx
 import pylab
 from networkx.drawing.nx_agraph import graphviz_layout
 import subprocess
-
+import tensorflow_model_optimization as tfmot
+from tensorflow_model_optimization.sparsity.keras import PolynomialDecay
 
 class bcolors:
     WHITE = '\033[97m'
@@ -129,8 +131,8 @@ class Trainer:
             data = fetch_openml(dataset)
             x_data, y_data = data['data'], data['target']
             
-            x_data.to_csv("datasets/"+dataset+'_raw_x_data.csv', index=False)
-            y_data.to_csv("datasets/"+dataset+'_raw_y_data.csv', index=False)
+            pd.DataFrame(x_data).to_csv("datasets/"+dataset+'_raw_x_data.csv', index=False)
+            pd.DataFrame(y_data).to_csv("datasets/"+dataset+'_raw_y_data.csv', index=False)
 
             y = self.le.fit_transform(y_data)
             unique = np.unique(y)
@@ -457,6 +459,14 @@ class Trainer:
                                                 save_weights_only=True,
                                                 verbose=1)
 
+        
+        from tensorflow_model_optimization.python.core.sparsity.keras import prune, pruning_callbacks, pruning_schedule
+        from tensorflow_model_optimization.sparsity.keras import strip_pruning
+        
+        pruning_params = {"pruning_schedule": pruning_schedule.ConstantSparsity(0.75, begin_step=2000, frequency=100)}
+        #self.model = prune.prune_low_magnitude(self.model, **pruning_params)
+        #self.model.compile(optimizer="adam", loss=['categorical_crossentropy'], metrics=['accuracy'])
+
         if self.network_spec == None:
             print(bcolors.OKGREEN + " # INFO: Start model training with networks specs ... "+bcolors.WHITE)
             self.model.fit(
@@ -483,6 +493,7 @@ class Trainer:
                 shuffle=shuffle,
                 callbacks=[cp_callback])
         
+        #self.model = strip_pruning(self.model)
         tf.keras.utils.plot_model(
             self.model,
             to_file='models/'+self.dataset+'/model.png',
@@ -496,6 +507,14 @@ class Trainer:
             show_layer_activations=True
         )
         
+        w = self.model.layers[0].weights[0].numpy()
+        h, b = np.histogram(w, bins=100)
+        plt.figure(figsize=(7, 7))
+        plt.bar(b[:-1], h, width=b[1] - b[0])
+        plt.semilogy()
+        print('% of zeros = {}'.format(np.sum(w == 0) / np.size(w)))
+
+        #self.exec_pruning()
         self.dump_json_for_bondmachine()
         self.get_json_model()
         self.build_graph()
@@ -505,16 +524,26 @@ class Trainer:
         print(bcolors.OKGREEN + " # INFO: Training finished, saved model path: "+'models/'+self.dataset+'_KERAS_model.h5'+bcolors.WHITE)
         self.model.save('models/'+self.dataset+'/model.h5')
         #meta_graph_def = tf.train.export_meta_graph(filename='models/'+self.dataset+'_KERAS_model.meta')
+        
 
     def dump_csv_prediction(self, predictions):
         results = []
         for pred in predictions:
             prediction = np.argmax(pred, axis=0)
-            to_save = [pred[0], pred[1] ,prediction]
+            to_save = []
+            for i in range(0, self.classes_len):
+                to_save.append(pred[i])
+                
+            to_save.append(prediction)
             results.append(to_save)
             
         import csv
-        fields = ['probability_0', 'probability_1', 'classification'] 
+        fields = [] 
+
+        for i in range(0, self.classes_len):
+            fields.append('probability_'+str(i))
+            
+        fields.append('classification')
 
         with open("datasets/"+self.dataset+'_swprediction.csv', 'w') as f:
             write = csv.writer(f)
@@ -535,6 +564,34 @@ class Trainer:
             sys.exit(0)
             
         input(bcolors.OKGREEN+" # INFO: press enter to continue"+bcolors.WHITE)
+
+    def exec_pruning(self):
+        self.model.summary()
+        
+        pruning_params = {'pruning_schedule': PolynomialDecay(initial_sparsity=0.50, final_sparsity=0.80, begin_step=2000, end_step=4000)}
+        model_for_pruning = tfmot.sparsity.keras.prune_low_magnitude(self.model, **pruning_params)
+        
+        model_for_pruning.compile(optimizer='adam',loss='categorical_crossentropy',metrics=['accuracy'])
+        model_for_pruning.summary()
+        callbacks = [tfmot.sparsity.keras.UpdatePruningStep()]
+        batch_size = int(self.X_train_val.shape[1]*10) if self.network_spec["network"]["training"]["batch_size"] == "default" else int(self.network_spec["network"]["training"]["batch_size"])
+        validation_split = 0.25 if self.network_spec["network"]["training"]["validation_split"] == "default" else float(self.network_spec["network"]["training"]["validation_split"])
+        model_for_pruning.fit(
+            self.X_train_val, 
+            self.y_train_val,
+            batch_size=batch_size,
+            validation_split=validation_split,
+            epochs=10,
+            callbacks=callbacks)
+
+        model_for_export = tfmot.sparsity.keras.strip_pruning(model_for_pruning)
+
+        print("final model")
+        model_for_export.summary()
+        
+        self.model = model_for_export
+        
+        
 
     def isBoardSupported(self):
 
