@@ -1,9 +1,9 @@
 hls4ml
 numpy
-matplotlib
+matplotlib==3.7.1
 scikit-learn
-pandas
+pandas==2.0.0
 tensorflow
 pydot
 xlrd
-networkx
+networkx==2.8.6

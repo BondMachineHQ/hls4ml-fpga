@@ -10,7 +10,7 @@ import numpy as np
 import os
 import tensorflow.compat.v1 as tf
 import pandas as pd
-#tf.disable_v2_behavior()
+tf.disable_v2_behavior()
 import ssl
 import sys
 import argparse
@@ -25,6 +25,7 @@ from networkx.drawing.nx_agraph import graphviz_layout
 import subprocess
 import tensorflow_model_optimization as tfmot
 from tensorflow_model_optimization.sparsity.keras import PolynomialDecay
+from qkeras import *
 
 class bcolors:
     WHITE = '\033[97m'
@@ -101,12 +102,14 @@ class Trainer:
                 "part": "xcu280-fsvh2892-2L-e"
             }
         ]
+        self.neural_networks_params = []
+        self.pruning = False
 
     def initialize(self) -> None:
         
         ssl._create_default_https_context = ssl._create_unverified_context
         np.random.seed(self.seed)
-        tf.random.set_random_seed(self.seed)
+        #tf.random.set_random_seed(self.seed)
         os.environ['PATH'] = self.vivado_path + os.environ['PATH']
 
     def setup_data(self, dataset) -> None:
@@ -212,6 +215,7 @@ class Trainer:
                     opt = Adam(lr=0.0001)
                 # handle more opt
                 
+                self.pruning = True if self.network_spec["network"]["training"]["pruning"] == "true" else False
                 
             self.model.add(Dense(self.classes_len, activation='softmax'))
             self.model.compile(optimizer=opt, loss=['categorical_crossentropy'], metrics=['accuracy'])
@@ -233,8 +237,14 @@ class Trainer:
 
             layer_info["weigths"] = flat_layer_weigth
             layer_info["bias"] = bias.tolist()
-            layer_info["act_func"] = layers[i].activation.__name__
+            
+            name = ""
+            try:
+                name = layers[i].activation.__name__
+            except Exception as e:
+                name = str(layers[i].activation)
 
+            layer_info["act_func"] = name
             to_export["layer_"+str(i)] = layer_info
 
         with open('models/'+self.dataset+'/model.json', 'w') as fp:
@@ -263,6 +273,9 @@ class Trainer:
                     try:
                         for v in range(0, len(layer_weights[m][w])):
                             
+                            if float(layer_weights[m][w][v]) == 0:
+                                continue
+                            
                             weights_value.append(float(layer_weights[m][w][v]))
 
                             weight_info = {
@@ -271,6 +284,7 @@ class Trainer:
                                     "PosPrevLayer": w,
                                     "Value": float(layer_weights[m][w][v])
                                 }
+                            self.neural_networks_params.append(float(layer_weights[m][w][v]))
                             weights.append(weight_info)
                     except:
                         continue
@@ -286,6 +300,7 @@ class Trainer:
                             "Type": "input",
                             "Bias": 0
                         }
+                        self.neural_networks_params.append(0)
                         nodes.append(node_info)
                     break
            
@@ -300,18 +315,24 @@ class Trainer:
                         "Bias": bias.tolist()[units]
                     }
                     nodes.append(node_info)
-
+                    self.neural_networks_params.append(float(node_info["Bias"]))
                     weights_value.append(node_info["Bias"])
                 else:
+                    name = ""
+                    try:
+                        name = layers[i].activation.__name__
+                    except Exception as e:
+                        name = str(layers[i].activation)
+                        
                     bias = layers[i].get_weights()[1]
                     node_info = {
                         "Layer": i+1,
                         "Pos": units,
-                        "Type": layers[i].activation.__name__,
+                        "Type": name,
                         "Bias": bias.tolist()[units]
                     }
                     nodes.append(node_info)
-
+                    self.neural_networks_params.append(float(node_info["Bias"]))
                     weights_value.append(node_info["Bias"])
 
             if i == len(layers) - 1:
@@ -335,6 +356,7 @@ class Trainer:
                                         "PosPrevLayer": l,
                                         "Value": 1
                                     }
+                        self.neural_networks_params.append(float(1))
                         weights.append(weight_info)
 
 
@@ -458,15 +480,7 @@ class Trainer:
         cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
                                                 save_weights_only=True,
                                                 verbose=1)
-
         
-        from tensorflow_model_optimization.python.core.sparsity.keras import prune, pruning_callbacks, pruning_schedule
-        from tensorflow_model_optimization.sparsity.keras import strip_pruning
-        
-        pruning_params = {"pruning_schedule": pruning_schedule.ConstantSparsity(0.75, begin_step=2000, frequency=100)}
-        #self.model = prune.prune_low_magnitude(self.model, **pruning_params)
-        #self.model.compile(optimizer="adam", loss=['categorical_crossentropy'], metrics=['accuracy'])
-
         if self.network_spec == None:
             print(bcolors.OKGREEN + " # INFO: Start model training with networks specs ... "+bcolors.WHITE)
             self.model.fit(
@@ -484,6 +498,7 @@ class Trainer:
             validation_split = 0.25 if self.network_spec["network"]["training"]["validation_split"] == "default" else float(self.network_spec["network"]["training"]["validation_split"])
             shuffle = True if self.network_spec["network"]["training"]["shuffle"] == "true" else False
 
+            
             self.model.fit(
                 self.X_train_val, 
                 self.y_train_val, 
@@ -492,6 +507,8 @@ class Trainer:
                 validation_split=validation_split, 
                 shuffle=shuffle,
                 callbacks=[cp_callback])
+        
+        print(self.model.summary())
         
         #self.model = strip_pruning(self.model)
         tf.keras.utils.plot_model(
@@ -514,10 +531,15 @@ class Trainer:
         plt.semilogy()
         print('% of zeros = {}'.format(np.sum(w == 0) / np.size(w)))
 
-        #self.exec_pruning()
+        if self.pruning:
+            print(bcolors.OKGREEN + " # INFO: Going to prune model: "+bcolors.WHITE)
+            self.exec_pruning()
         self.dump_json_for_bondmachine()
         self.get_json_model()
         self.build_graph()
+        
+        print("neural network parameters: ", self.neural_networks_params)
+        input("Watch parameters")
         
         #print(bcolors.OKGREEN + " # input name", self.model.input.op.name+bcolors.WHITE)
         #print(bcolors.OKGREEN + " # output name", self.model.output.op.name+bcolors.WHITE)
@@ -581,18 +603,14 @@ class Trainer:
             self.y_train_val,
             batch_size=batch_size,
             validation_split=validation_split,
-            epochs=10,
+            epochs=2,
             callbacks=callbacks)
 
         model_for_export = tfmot.sparsity.keras.strip_pruning(model_for_pruning)
-
-        print("final model")
         model_for_export.summary()
         
         self.model = model_for_export
         
-        
-
     def isBoardSupported(self):
 
         for board in self.hls4ml_supported_boards:

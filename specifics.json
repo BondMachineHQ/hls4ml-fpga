@@ -3,29 +3,25 @@
         "arch": [
             {
                 "layer_name": "l1",
-                "activation_function": "relu",
-                "neurons": 64
+                "activation_function": "linear",
+                "neurons": 10
             },
             {
                 "layer_name": "l2",
-                "activation_function": "relu",
-                "neurons": 32
-            },
-            {
-                "layer_name": "l3",
-                "activation_function": "relu",
-                "neurons": 32
+                "activation_function": "linear",
+                "neurons": 10
             }
         ],
         "training": {
-            "epochs": 10,
+            "epochs": 2,
             "optimizer": "Adam",
             "loss": "categorical_crossentropy",
             "metrics": "accuracy",
             "learning_rate": 0.0001,
             "batch_size": "default",
             "validation_split": "default",
-            "shuffle": "true"
+            "shuffle": "true",
+            "pruning": "true"
         }
     }
 }
